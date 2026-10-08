@@ -158,10 +158,12 @@ function _requirements_satisfied(
     solver::SolverCapability,
     resource::ResourceSpec,
 )
-    available = union(problem.features, resource.capabilities.provides)
-    resource_environment = union(problem.features, solver.capabilities.provides)
-    return issubset(solver.capabilities.requires, available) &&
-           issubset(resource.capabilities.requires, resource_environment)
+    return all(capability -> capability in problem.features ||
+               capability in resource.capabilities.provides,
+               solver.capabilities.requires) &&
+           all(capability -> capability in problem.features ||
+               capability in solver.capabilities.provides,
+               resource.capabilities.requires)
 end
 
 @testitem "Capability inventory" default_imports=false begin

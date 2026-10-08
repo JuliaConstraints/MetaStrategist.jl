@@ -59,9 +59,11 @@ function compatible(
     guidance::UserGuidance = UserGuidance(),
 )
     _requirements_satisfied(problem, solver, resource) || return false
-    available = _available_capabilities(problem, solver, resource)
-    return issubset(guidance.required, available) &&
-           isempty(intersect(guidance.forbidden, available))
+    present = capability -> capability in problem.features ||
+        capability in solver.capabilities.provides ||
+        capability in resource.capabilities.provides
+    return all(present, guidance.required) &&
+           all(capability -> !present(capability), guidance.forbidden)
 end
 
 """Enumerate compatible solver/resource pairs without ranking or hidden learning."""

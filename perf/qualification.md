@@ -191,3 +191,58 @@ scopes are .087/1.725/.019298 s. Three GC and lock samples have zero compilation
 and lock conflicts; one sample in each analyzer collects (.012372/.016117 s).
 Reachable fixture state stays 44,337 bytes, or 52,753 bytes including its final
 resolved description, in all three observations. Raw reports are not saved.
+
+## Capability filtering
+
+Compatibility checks now test membership in the original capability sets,
+without constructing temporary unions and intersections. Solver requirements
+still use problem features and resource provisions; resource requirements still
+use problem features and solver provisions. Guidance uses all three provision
+sources. The separate union-returning helper still returns a fresh owned set.
+Binding enumeration retains input order, duplicate input entries and fresh
+result vectors. Current mutable input sets are read on each call.
+
+`capability_scenarios.jl` prepares sixteen solvers, sixteen resources and four
+guidance policies. Each operation checks 32,768 combinations. The compatibility
+case counts 9,472 acceptances. The binding case performs 32 passes over all four
+policies and retains final ordered lists of lengths 128/64/40/64. Independent
+fixture-id rules verify both results. Guidance construction is outside timing;
+these are admission operations, not solver episode or campaign measurements.
+
+The baseline is MetaStrategist `0b761608726025d2fec402ad18b6e1773045fa2b` in a
+temporary source snapshot. LocalSearchSolvers
+`bcc516b6fa1d3edc9732bebb38a009719491c8d1`, CBLS
+`2c453ddee7f3af7433573969916caec1918fe8d4` and resolved dependencies are unchanged.
+Only the MetaStrategist path differs between environments. Both use the
+two-core limits above. Collection is requested outside each timed sample;
+measured compilation and collection time are zero in all table observations.
+
+| Warm matched operation | Before bytes / objects | After bytes / objects | Before seconds (5 samples) | After seconds (5 samples) |
+|---|---:|---:|---|---|
+| 32,768 compatibility checks | 27,627,760 / 345,347 | 240 / 3 | .006521991, .006632872, .006604609, .006667561, .006750497 | .000922365, .000988069, .000917204, .000931578, .000935573 |
+| 128 binding queries | 28,022,016 / 346,114 | 394,496 / 770 | .006680790, .006649141, .006621608, .006734366, .006949253 | .001088769, .000985650, .001050503, .000999038, .000992810 |
+
+All 22,083 MetaStrategist checks and full Aqua pass. The 12,316 new checks also
+pass against the baseline. They enumerate all two-capability problem,
+provision, requirement and valid guidance combinations using an independent
+bitmask oracle, then check mutations between calls, unchanged input sets,
+fresh union results and ordered binding vectors with duplicate inputs.
+Fourteen LocalSearchSolvers checks pass for two private typed workers,
+exact reset/replay and original score validation.
+
+All four PerfChecker collectors pass both operations. BenchmarkTools,
+Chairmarks and independent allocation-profile totals agree on zero bytes /
+objects for the concrete compatibility operation, and 394,288 bytes / 769
+objects for binding enumeration. Remaining binding allocations own its output
+vectors; preparation and default-guidance construction are separate scopes.
+JET optimization findings remain zero. AllocCheck falls from nine findings to
+zero for the compatibility operation. This does not qualify every caller or
+the whole preparation lifecycle as allocation-free.
+
+All nine native analyzer adapters complete. Inclusive SnoopCompile inference
+is .107 s. Separate source/first/warm lifecycle latency scopes are
+.071/.723/.001051 s. Three GC and lock samples allocate zero bytes, with no
+compilation, collection or conflicts. Reachable fixture state stays 45,216
+bytes, or 45,224 bytes including its scalar result. The redacted heap snapshot
+passes verification and is removed with the raw diagnostic artifacts.
+Measurements remain operational evidence on a shared machine.
