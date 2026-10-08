@@ -138,3 +138,56 @@ encoded string. Raw reports and the comparison module were not saved.
 The 13,358-byte receipt from a real 32-variable LocalSearchSolvers prepared unit
 was byte-identical under the previous and new encoders. All 11,878
 LocalSearchSolvers regression checks passed with the new MetaStrategist source.
+
+## Count incoming edges during phase resolution
+
+Resolution now counts incoming ordering edges once and advances the whole ready
+batch before collecting its successors. Each new batch retains the original
+lexical ordering. This removes repeated scans over every remaining phase while
+preserving dependency closure, effect validation, duplicate-edge handling,
+cycle diagnostics, snapshots and semantic/shape identities.
+
+`resolution_scenarios.jl` resolves each fixed catalogue sixteen times per
+operation: chains of 3/64/129 phases, 64 independent phases, and four fully
+connected layers of sixteen phases. Independent expected orders and five pairs
+of baseline identity hashes pass before and after. The baseline is
+MetaStrategist `f64bfa4d68f3f80b08eee473a3bfc90f56e0fb5d`; LocalSearchSolvers
+`dca296e339cbdf617e2645f1871983a134920d80`, CBLS
+`2c453ddee7f3af7433573969916caec1918fe8d4` and resolved dependencies are unchanged.
+Both environments use the two-core limits above. Collection is requested
+outside each timed observation. Compilation time is zero in all warm samples.
+
+| Sixteen resolutions | Before bytes / objects | After bytes / objects | Before seconds (3 samples) | After seconds (3 samples) |
+|---|---:|---:|---|---|
+| chain, 3 phases | 556,784 / 8,963 | 557,568 / 8,835 | .000989203, .000920043, .000949789 | .000928845, .000873210, .000870873 |
+| chain, 64 phases | 26,217,968 / 659,235 | 13,476,608 / 284,115 | .028234098, .028338512, .028249853 | .017648517, .018062823, .018044748 |
+| chain, 129 phases | 97,777,136 / 2,791,843 | 32,208,640 / 842,339 | .115115643, .114582794, .114799315 | .042062980, .041843313, .041903248 |
+| independent, 64 phases | 12,298,224 / 281,251 | 11,933,952 / 269,235 | .017218059, .017358111, .017496604 | .016643799, .016654314, .017028430 |
+| layered, 64 phases | 17,352,688 / 342,835 | 16,698,624 / 322,371 | .022363795, .022292080, .023932284 | .025510363, .021862748, .021598528 |
+
+The smallest chain uses 784 additional bytes per sixteen resolutions for its
+edge-count table, despite fewer objects. Timing is operational evidence on a
+shared machine, rather than a campaign or hot-kernel throughput result. The
+129-phase baseline samples spend .004730/.005085/.005090 s in collection;
+other table samples have zero measured collection time.
+
+All 9,767 package checks and full Aqua pass. The 8,737 new checks enumerate all
+4,096 directed four-phase graphs, use valid permutations and longest-path depth
+as an independent order oracle, verify identities under reversed roots, reject
+cycles and cover duplicate dependency/before/after edges. These checks also pass
+against the original resolver. Fourteen LocalSearchSolvers checks pass for two
+private typed workers, exact reset/replay and original score validation.
+
+All four PerfChecker collectors pass all three 64-phase topologies. To bound
+full allocation-profile volume, these collector operations resolve once:
+chain 842,328 bytes / 17,758 objects; independent 745,912 / 16,828; layered
+1,043,704 / 20,149. BenchmarkTools, Chairmarks and independent allocation-profile
+totals agree. Analyzer operations retain sixteen chain resolutions.
+
+JET has 125 findings and AllocCheck 122 through cold dynamic catalogue and
+identity construction; this operation is not inference- or allocation-free.
+Inclusive SnoopCompile inference is 1.073 s. Separate source/first/warm latency
+scopes are .087/1.725/.019298 s. Three GC and lock samples have zero compilation
+and lock conflicts; one sample in each analyzer collects (.012372/.016117 s).
+Reachable fixture state stays 44,337 bytes, or 52,753 bytes including its final
+resolved description, in all three observations. Raw reports are not saved.

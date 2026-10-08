@@ -7,6 +7,7 @@ using TestItems
     include("Aqua.jl")
     include("TestItemRunner.jl")
     include("specialization.jl")
+    include("resolution_order.jl")
     include("preparation_services.jl")
     include("reference_preparation.jl")
 end

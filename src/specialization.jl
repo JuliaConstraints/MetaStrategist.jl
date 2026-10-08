@@ -195,11 +195,23 @@ function resolve_strategy(catalog::PhaseCatalog, profile::StrategyProfile;
             haskey(active,later) && push!(edges[r],later)
         end
     end
+    incoming=Dict(r=>0 for r in roles)
+    for successors in values(edges), successor in successors
+        incoming[successor]+=1
+    end
     order=Symbol[]; pending=Set(roles)
+    ready=filter(r->iszero(incoming[r]),roles)
     while !isempty(pending)
-        ready=filter(r->all(p->!(r in edges[p]),pending),sort!(collect(pending);by=string))
         isempty(ready) && throw(ArgumentError("phase ordering cycle among $(sort!(collect(pending);by=string))"))
         append!(order,ready); setdiff!(pending,ready)
+        # Finish the entire ready batch before collecting its successors, so
+        # independent phases retain the original lexical batch ordering.
+        next_ready=Symbol[]
+        for role in ready, successor in edges[role]
+            incoming[successor]-=1
+            iszero(incoming[successor]) && push!(next_ready,successor)
+        end
+        ready=sort!(next_ready;by=string)
     end
     # Reuse the DAG closure for every effect pair instead of allocating a DFS
     # traversal per pair. The order above is already proven acyclic.
