@@ -75,22 +75,49 @@ end
 
 # Explicit type tags and exact float bits. This is an identity encoding, not Julia display.
 function canonical_value(x)
-    x === nothing && return "n;"
-    x isa Bool && return x ? "b1;" : "b0;"
-    x isa Symbol && return "y"*canonical_value(string(x))
-    if x isa String
+    Base.@nospecialize x
+    io=IOBuffer()
+    _write_canonical_value(io,x)
+    String(take!(io))
+end
+
+# Identity encoding is cold and value-driven. Stream into one buffer instead of
+# specializing recursive string joins for every nested strategy/receipt tuple.
+function _write_canonical_value(io::IO,x)
+    Base.@nospecialize x
+    if x === nothing
+        write(io,"n;")
+    elseif x isa Bool
+        write(io,x ? "b1;" : "b0;")
+    elseif x isa Symbol
+        write(io,"y")
+        _write_canonical_value(io,string(x))
+    elseif x isa String
         (startswith(x,"/") || startswith(x,"\\\\") || occursin(r"^[A-Za-z]:[/\\]",x)) &&
             throw(ArgumentError("absolute paths are not portable strategy parameters"))
-        return "s$(ncodeunits(x)):"*x
-    end
-    x isa Integer && isbitstype(typeof(x)) && return "i$(typeof(x)):$(x);"
-    x isa Union{Float16,Float32,Float64} && return "f$(sizeof(x)):$(bitstring(x));"
-    if x isa NamedTuple
+        print(io,"s",ncodeunits(x),":",x)
+    elseif x isa Integer && isbitstype(typeof(x))
+        print(io,"i",typeof(x),":",x,";")
+    elseif x isa Union{Float16,Float32,Float64}
+        print(io,"f",sizeof(x),":",bitstring(x),";")
+    elseif x isa NamedTuple
         keys_sorted=sort!(collect(keys(x));by=string)
-        return "m"*join(canonical_value(k)*canonical_value(x[k]) for k in keys_sorted)*";"
+        write(io,"m")
+        for key in keys_sorted
+            _write_canonical_value(io,key)
+            _write_canonical_value(io,x[key])
+        end
+        write(io,";")
+    elseif x isa Tuple
+        write(io,"t")
+        for value in x
+            _write_canonical_value(io,value)
+        end
+        write(io,";")
+    else
+        throw(ArgumentError("non-portable strategy parameter $(typeof(x)); use immutable scalar/tuple values"))
     end
-    x isa Tuple && return "t"*join(canonical_value(v) for v in x)*";"
-    throw(ArgumentError("non-portable strategy parameter $(typeof(x)); use immutable scalar/tuple values"))
+    nothing
 end
 _parameter_shape(x::NamedTuple) = NamedTuple{Tuple(sort!(collect(keys(x));by=string))}(
     Tuple(_parameter_shape(x[k]) for k in sort!(collect(keys(x));by=string)))
