@@ -246,3 +246,60 @@ compilation, collection or conflicts. Reachable fixture state stays 45,216
 bytes, or 45,224 bytes including its scalar result. The redacted heap snapshot
 passes verification and is removed with the raw diagnostic artifacts.
 Measurements remain operational evidence on a shared machine.
+
+## Parameter shapes and normalization
+
+Named-tuple shape descriptions now sort their keys once and iterate the sorted
+vector while constructing the result. Normalization uses the same vector
+iteration, avoiding runtime tuple iteration and temporary comparison strings.
+Core scalar shape labels use their type names; custom and parameterized types
+retain Julia's complete type display. Key order, scalar values, floating-point
+bits and semantic/shape identities remain unchanged.
+
+`parameter_scenarios.jl` builds thirty-two descriptions from the existing
+64-file receipt fixture. Recursive key-order checks and two baseline hashes
+verify the final outputs: a 3,292-byte shape encoding and the original
+8,492-byte normalized encoding. The included receipt fixture is declared as
+a PerfChecker input fingerprint. Preparation and verification are outside
+the measured operation.
+
+The baseline is MetaStrategist `c2f0a345eb20f211b116a6aa1629cde79c763b49` in
+a temporary source snapshot. LocalSearchSolvers
+`bcc516b6fa1d3edc9732bebb38a009719491c8d1`, CBLS
+`2c453ddee7f3af7433573969916caec1918fe8d4` and resolved dependencies are
+unchanged. Only the MetaStrategist path differs. Both environments use the
+two-core limits above; collection occurs outside timed observations.
+Compilation and collection time are zero in all table samples.
+
+| Thirty-two constructions | Before bytes / objects | After bytes / objects | Before seconds (5 samples) | After seconds (5 samples) |
+|---|---:|---:|---|---|
+| parameter shapes | 4,242,688 / 73,728 | 2,681,600 / 32,000 | .003570501, .003542525, .003577777, .003492733, .003460954 | .001971360, .001982085, .001981668, .001991126, .001961623 |
+| normalized parameters | 3,084,544 / 37,504 | 2,506,496 / 26,208 | .002491414, .002506974, .002440936, .002528793, .002494660 | .001872072, .001906098, .001926788, .001914887, .001908592 |
+
+All 24,037 package checks and full Aqua pass. The 1,954 new checks also pass
+against the baseline. They cover every core scalar label, the generic custom
+type fallback, nested empty structures, Unicode/ASCII key pairs, signed zero
+and NaN payloads, using a separate string-sorted structural reference and exact
+canonical byte comparisons. Fourteen LocalSearchSolvers checks pass for two
+private workers and exact reset/replay. Shape and normalization of an actual
+prepared-unit receipt are structurally and byte-identical under both helper
+versions: 4,176 and 13,358 encoded bytes respectively.
+
+All four PerfChecker collectors pass both operations. BenchmarkTools,
+Chairmarks and independent allocation-profile totals agree on the after
+byte/object counts in the table. Shape JET optimization findings fall from
+35 to 12, and AllocCheck
+findings from 32 to 23. Normalization has a static-analysis tradeoff: JET
+findings rise from 2 to 12 and AllocCheck findings from 13 to 25, despite the
+measured runtime and allocation improvement. These cold dynamic operations
+remain inference- and allocation-bearing; no universal inference-free claim
+is made.
+
+All nine native analyzer adapters complete for the shape case. Inclusive
+SnoopCompile inference is 3.538 s. Source/first/warm full lifecycle latency
+scopes are .077/1.908/.005773 s. Three GC and lock samples each allocate
+2,681,600 bytes, with no compilation, collection or conflicts. Reachable
+fixture state stays 7,724 bytes, or 11,723 bytes including its final shape
+description. The redacted heap snapshot passes verification and is removed
+with the raw diagnostic artifacts. Timing remains operational evidence on
+a shared machine.

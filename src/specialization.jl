@@ -128,16 +128,22 @@ function _write_canonical_value(io::IO,x)
     end
     nothing
 end
-_parameter_shape(x::NamedTuple) = NamedTuple{Tuple(sort!(collect(keys(x));by=string))}(
-    Tuple(_parameter_shape(x[k]) for k in sort!(collect(keys(x));by=string)))
+function _parameter_shape(x::NamedTuple)
+    names=sort!(collect(keys(x)))
+    NamedTuple{Tuple(names)}(Tuple(_parameter_shape(x[k]) for k in names))
+end
 _parameter_shape(x::Tuple) = map(_parameter_shape,x)
 _normalize_strategy_value(x::Tuple)=map(_normalize_strategy_value,x)
 _normalize_strategy_value(x)=x
 function _normalize_strategy_value(x::NamedTuple)
-    names=Tuple(sort!(collect(keys(x));by=string))
-    NamedTuple{names}(Tuple(_normalize_strategy_value(x[k]) for k in names))
+    names=sort!(collect(keys(x)))
+    NamedTuple{Tuple(names)}(Tuple(_normalize_strategy_value(x[k]) for k in names))
 end
 
+_parameter_shape(x::Union{Nothing,Bool,Symbol,String,Float16,Float32,Float64,
+    Int8,Int16,Int32,Int64,Int128,UInt8,UInt16,UInt32,UInt64,UInt128}) =
+    string(nameof(typeof(x)))
+# Custom types retain Julia's complete type display.
 _parameter_shape(x) = string(typeof(x))
 function _phase_description(p::ResolvedPhase; shape=false)
     d=p.definition
