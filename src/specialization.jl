@@ -83,6 +83,11 @@ end
 
 # Identity encoding is cold and value-driven. Stream into one buffer instead of
 # specializing recursive string joins for every nested strategy/receipt tuple.
+function _write_decimal_length(io::IO,count::Int)
+    count>=10 && _write_decimal_length(io,count÷10)
+    write(io,UInt8(48+count%10))
+    nothing
+end
 function _write_canonical_value(io::IO,x)
     Base.@nospecialize x
     if x === nothing
@@ -95,13 +100,17 @@ function _write_canonical_value(io::IO,x)
     elseif x isa String
         (startswith(x,"/") || startswith(x,"\\\\") || occursin(r"^[A-Za-z]:[/\\]",x)) &&
             throw(ArgumentError("absolute paths are not portable strategy parameters"))
-        print(io,"s",ncodeunits(x),":",x)
+        write(io,UInt8(115))
+        _write_decimal_length(io,ncodeunits(x))
+        write(io,UInt8(58))
+        write(io,x)
     elseif x isa Integer && isbitstype(typeof(x))
         print(io,"i",typeof(x),":",x,";")
     elseif x isa Union{Float16,Float32,Float64}
         print(io,"f",sizeof(x),":",bitstring(x),";")
     elseif x isa NamedTuple
-        keys_sorted=sort!(collect(keys(x));by=string)
+        # Symbols and their String names use the same byte-lexical ordering.
+        keys_sorted=sort!(collect(keys(x)))
         write(io,"m")
         for key in keys_sorted
             _write_canonical_value(io,key)

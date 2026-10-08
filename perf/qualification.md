@@ -97,3 +97,44 @@ no collection, compilation or conflicts. Fixture state stayed 4,731 bytes;
 state with the final prepared result was 5,881 bytes. The process preparation
 service retains admission history by design; this fixture-size observation
 does not describe that process-wide history. Raw reports are not committed.
+
+## Canonical byte-count and key-order allocation
+
+The canonical writer now emits a string's nonnegative decimal byte count
+directly into its buffer and sorts Symbol keys directly. Julia's Symbol and
+String comparisons use the same byte-lexical order; no per-comparison key
+strings are needed. The tags, UTF-8 byte lengths, scalar formatting, absolute
+path checks, key order and resulting identities are preserved.
+
+Before source was read from `022c052497d6caf21d71f19b3167dd8c11eca24a` into an
+isolated in-memory module. Before and after functions used the same description,
+process, resolved dependencies and two-core limits. Both were warmed; sample
+order alternated using seed 91, with collection outside the timed operation.
+The raw encoding loop discards each string; receipt construction retains its
+final result. Both evaluate 32 identical descriptions. All samples had zero
+measured compilation and collection.
+
+| Matched operation | Before bytes / objects | After bytes / objects | Before seconds (3 samples) | After seconds (3 samples) |
+|---|---:|---:|---|---|
+| 32 raw encodings | 2,409,472 / 44,256 | 1,504,256 / 15,968 | .003477889, .003449592, .003430666 | .002387287, .002391183, .002376248 |
+| 32 receipt constructions | 2,521,168 / 44,705 | 1,615,952 / 16,417 | .004291643, .004112657, .004007132 | .003124438, .003154983, .003083262 |
+
+The reference 8,492-byte encoding and SHA-256 identity remain unchanged. All
+1,030 MetaStrategist checks passed, including full Aqua and 802 new byte-count
+boundary, Unicode/ASCII Symbol ordering and canonical key-encoding checks.
+These remain operational measurements on a shared machine.
+
+All four PerfChecker collectors passed the canonical case, which retains the
+final string. Their independent operation totals agreed on 1,551,872 bytes /
+16,000 objects. JET reported 57 optimization findings in intentionally dynamic
+serialization/type display; AllocCheck reported 2 possible allocations. These
+static findings do not cover every runtime dispatch target, and the measured
+operation still allocates. Inclusive SnoopCompile inference was .390 s.
+Separate source/first/warm full case latency scopes were .071/.553/.002499 s.
+Three GC and lock samples had no collection, compilation or conflicts.
+Reachable description state stayed 7,724 bytes, or 16,232 bytes with its final
+encoded string. Raw reports and the comparison module were not saved.
+
+The 13,358-byte receipt from a real 32-variable LocalSearchSolvers prepared unit
+was byte-identical under the previous and new encoders. All 11,878
+LocalSearchSolvers regression checks passed with the new MetaStrategist source.

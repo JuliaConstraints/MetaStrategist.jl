@@ -19,3 +19,27 @@ import MetaStrategist: canonical_value
         @test_throws ArgumentError canonical_value(value)
     end
 end
+
+@testset "Byte counts and symbol ordering retain canonical identities" begin
+    for count in (0,1,9,10,99,100,255,256,999,1000,10_000,typemax(Int))
+        buffer=IOBuffer()
+        MetaStrategist._write_decimal_length(buffer,count)
+        @test String(take!(buffer))==string(count)
+    end
+    for count in (0,1,9,10,99,100,255,256,999,1000)
+        text=repeat("é",count)
+        @test canonical_value(text)=="s$(2count):$text"
+    end
+    names=(Symbol(""),:a,:aa,:A,:Z,:z,:_,:path,:sha256,:α,:β,:é,
+        Symbol("é"),Symbol("🙂"),Symbol("\n"),Symbol("\x01"),Symbol("a/b"),
+        Symbol("C:x"),Symbol("a:b"),Symbol("a\\b"))
+    for left in names,right in names
+        @test isless(left,right)==isless(string(left),string(right))
+        left==right && continue
+        value=NamedTuple{(left,right)}((Int8(1),Int8(2)))
+        records=sort!([left=>Int8(1),right=>Int8(2)];by=record->string(first(record)))
+        expected="m"*join(("ys$(ncodeunits(string(key))):$(key)iInt8:$(number);"
+            for (key,number) in records))*";"
+        @test canonical_value(value)==expected
+    end
+end
