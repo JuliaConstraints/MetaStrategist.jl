@@ -8,4 +8,5 @@ using TestItems
     include("TestItemRunner.jl")
     include("specialization.jl")
     include("preparation_services.jl")
+    include("reference_preparation.jl")
 end

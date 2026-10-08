@@ -402,7 +402,9 @@ function instantiate_strategy(template::StrategyTemplate, context=nothing;
         end
         kernel=if selected==:reference
             budget.fallbacks+=mode==:reference ? 0 : 1
-            ReferenceKernel(Any[phases...])
+            # The reference factory path already returns a fresh owned vector.
+            # An actual-type quota fallback still arrives with a typed tuple.
+            ReferenceKernel(phases isa Vector{Any} ? phases : Any[phases...])
         else
             push!(budget.variants,signature); push!(budget.admitted_shapes,template.shape_key)
             selected==:typed ? TypedKernel(phases) :
