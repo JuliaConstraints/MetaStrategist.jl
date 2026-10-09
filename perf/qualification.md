@@ -494,3 +494,15 @@ Inclusive inference is 1.789083 s; load/first/warm latency is
 samples each allocate 3,149,696 bytes, with zero compilation, collection or
 observed conflicts. Reachable fixture state stays 273,909 bytes, or 276,005
 with the result. The verified redacted heap and temporary reports are removed.
+
+
+## Isolated package test dependency, 2026-10-09
+
+The regression fixtures import Random, which was available in the shared
+qualification environment but missing from the isolated package test target.
+Random is now declared in test extras, compatibility and the test target.
+Runtime dependencies and assertions are unchanged from 7eccefa0bdd1f40fb9801ca3c936076d11afde23.
+The complete standard Pkg.test("MetaStrategist"; allow_reresolve=false) passes
+130,514 assertions including Aqua with offline resolution, Julia 1.13.1,
+CPUs 0/2, two Julia threads and one GC thread. LocalSearchSolvers includes the
+qualified short floating sum source; other dependency sources remain unchanged.
