@@ -1,10 +1,16 @@
 function _encode_strategy_value(x)
     canonical_value(x)
+    _encode_validated_strategy_value(x)
+end
+
+# The complete immutable value has already passed the portable-parameter validator.
+# Recursive children need only be encoded; validating them again repeats subtree work.
+function _encode_validated_strategy_value(x)
     if x isa NamedTuple
         names=sort!(collect(keys(x));by=string)
-        return Dict("kind"=>"named","names"=>string.(names),"values"=>[_encode_strategy_value(x[k]) for k in names])
+        return Dict("kind"=>"named","names"=>string.(names),"values"=>[_encode_validated_strategy_value(x[k]) for k in names])
     elseif x isa Tuple
-        return Dict("kind"=>"tuple","values"=>[_encode_strategy_value(v) for v in x])
+        return Dict("kind"=>"tuple","values"=>[_encode_validated_strategy_value(v) for v in x])
     elseif x === nothing
         return Dict("kind"=>"nothing")
     elseif x isa Union{Float16,Float32,Float64}

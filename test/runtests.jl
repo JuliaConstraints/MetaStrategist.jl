@@ -4,6 +4,7 @@ using TestItems
 
 @testset "MetaStrategist.jl" begin
     include("canonical_encoding.jl")
+    include("archive_encoding.jl")
     include("parameter_shapes.jl")
     include("Aqua.jl")
     include("TestItemRunner.jl")

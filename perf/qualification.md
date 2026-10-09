@@ -374,3 +374,56 @@ inference is .987 s. Separate load/first/warm lifecycle latency is
 bytes, without compilation, collection or observed conflicts. Reachable fixture
 state stays 46,913 bytes, or 55,345 with the result. The verified redacted heap
 snapshot and raw reports are removed.
+
+## Portable checkpoint encoding, 2026-10-09
+
+The strategy and preparation-receipt codec now validates the complete immutable
+value once before recursively encoding it. The original portable validator,
+scalar tags, exact float bits, key order, archive schema, integrity checks and
+exclusive writes are retained. Previously, every child repeated validation of
+its subtree. This change concerns cold checkpoint work, not search throughput.
+
+The comparison uses MetaStrategist `4ae6f246b9a131b1d5b8c17b850b9477a426961d`
+in a temporary source checkout. Dependency versions and paths match except for
+MetaStrategist; LocalSearchSolvers is `bcc516b` and CBLS is `93e83b6`.
+Julia 1.13.1 uses CPUs 0/2, two Julia threads and one GC thread. Each exact
+operation is warmed three times before five observations. Compilation and
+recompilation totals are zero in every measured row.
+
+| Fixture, 32 encodings | Before bytes / objects | After bytes / objects |
+| --- | ---: | ---: |
+| Preparation receipt, 64 source files | 16,470,016 / 197,792 | 8,922,624 / 99,520 |
+| Three-phase strategy | 3,168,768 / 51,936 | 2,369,024 / 35,904 |
+| 129-phase strategy | 152,444,416 / 2,060,480 | 118,934,528 / 1,394,976 |
+
+Receipt encoding takes .013413–.014415 s before and .003943–.004229 s after;
+129-phase encoding takes .108925–.110867 s before and .058375–.074283 s after.
+The large case includes GC in both processes. These are matched-work observations
+on a shared machine, not controlled application throughput estimates.
+
+Four complete write/read/verify operations also allocate less: the receipt
+uses 6,914,880–6,917,544 bytes before and 5,971,456–5,974,120 after; the small
+strategy uses 1,368,448–1,369,056 before and 1,268,288–1,268,992 after; the large
+strategy uses 61,513,376–61,529,800 before and 57,324,640–57,342,064 after.
+Write timing ranges overlap. All three files are byte-identical to the previous
+implementation; their fixed SHA-256 identities are checked in `archive_scenarios.jl`.
+Every temporary archive directory is removed in a `finally` block.
+
+The new 969 checks pass before and after, including exact integer types, signed
+zero, infinity and NaN payloads, Unicode, nested portable-validation errors and
+archive history preservation. The full updated suite passes 62,784 assertions
+including Aqua. All four native collectors pass all six encode/write cases.
+For one encoding, BenchmarkTools, Chairmarks and full allocation profiles agree
+on receipt/small/large totals of 278,832/74,032/3,722,976 bytes and
+3,110/1,122/43,594 objects. Full writes retain expected filesystem and decoding
+allocations; the fresh collector boundary differs slightly from repeated direct
+measurements.
+
+All nine native diagnostic adapters complete for receipt encoding. JET retains
+82 findings; AllocCheck falls from 361 to 309. This codec remains dynamic and
+allocating. Inclusive inference is 3.935 s; load/first/warm case latency is
+.094/3.500/.001692 s. Three GC observations allocate 278,832 bytes each, with
+zero compilation and one process-wide collection in the first observation;
+three lock observations see no conflicts. Reachable fixture memory stays
+9,300 bytes, or 121,450 with the fresh encoded result. The verified redacted
+heap snapshot and temporary reports are removed.
