@@ -14,7 +14,8 @@ function _encode_validated_strategy_value(x)
     elseif x === nothing
         return Dict("kind"=>"nothing")
     elseif x isa Union{Float16,Float32,Float64}
-        return Dict("kind"=>"float","type"=>string(typeof(x)),"bits"=>bitstring(x))
+        type = x isa Float16 ? "Float16" : x isa Float32 ? "Float32" : "Float64"
+        return Dict("kind"=>"float","type"=>type,"bits"=>bitstring(x))
     elseif x isa Bool
         return Dict("kind"=>"bool","value"=>x)
     elseif x isa Integer

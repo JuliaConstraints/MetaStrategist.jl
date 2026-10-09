@@ -20,6 +20,23 @@ function receipt(count)
         execution=(;requested=:typed,effective=:typed),model_revision=UInt64(7))
 end
 
+function encode_case(parameters)
+    count = get(parameters,"coefficients",128)
+    repetitions = get(parameters,"repetitions",16)
+    prepare = () -> MS.receipt_snapshot(receipt(count))
+    operation = fixture -> begin
+        result = nothing
+        for _ in 1:repetitions
+            result = MS._encode_strategy_value(fixture)
+        end
+        result
+    end
+    verify = (fixture,result) -> digest(MS._decode_strategy_value(result)) == GOLDEN[count].canonical &&
+        bytes2hex(SHA.sha256(sprint(io -> TOML.print(io,
+            Dict("schema"=>"preparation-receipt/1","receipt"=>result);sorted=true)))) == GOLDEN[count].file
+    (;prepare,operation,verify)
+end
+
 function decode_case(parameters)
     count = get(parameters,"coefficients",128)
     repetitions = get(parameters,"repetitions",16)
@@ -66,5 +83,6 @@ function write_case(parameters)
     (;prepare,operation,verify)
 end
 end
+archive_float_encode_case(parameters) = ArchiveFloatScenarios.encode_case(parameters)
 archive_float_decode_case(parameters) = ArchiveFloatScenarios.decode_case(parameters)
 archive_float_write_case(parameters) = ArchiveFloatScenarios.write_case(parameters)

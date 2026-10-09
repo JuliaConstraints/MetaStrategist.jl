@@ -506,3 +506,66 @@ The complete standard Pkg.test("MetaStrategist"; allow_reresolve=false) passes
 130,514 assertions including Aqua with offline resolution, Julia 1.13.1,
 CPUs 0/2, two Julia threads and one GC thread. LocalSearchSolvers includes the
 qualified short floating sum source; other dependency sources remain unchanged.
+
+
+## Fixed portable float type names, 2026-10-09
+
+Float16/Float32/Float64 checkpoint records now reuse their three fixed type
+name strings. Bit serialization, root validation, integer/custom type handling
+and decoding are unchanged. Strings are immutable; the codec already shares its
+fixed record-kind strings.
+
+The matched baseline is 710b656c4b0b8ecc0ff0c2826aa64a639b1ac329. Dependency
+versions and sources match, including LocalSearchSolvers 1603b05 and CBLS
+8d5e877. Julia 1.13.1 uses CPUs 0/2, two Julia threads and one GC thread.
+Three exact warmups precede five observations; compilation, recompilation
+and GC are zero in all eight workloads.
+
+The added encode factory in [archive_float_scenarios.jl](archive_float_scenarios.jl)
+verifies the existing canonical and complete TOML file SHA-256 golden identities
+for all three receipt sizes. All 67,598 scalar encoding records also preserve
+their exact type name, serialized bits and decoded bits: every Float16 word,
+plus seven exceptional/boundary patterns and 1,024 random UInt32/UInt64 words
+per wider type using MersenneTwister seed 929. The complete standard
+Pkg.test("MetaStrategist"; allow_reresolve=false) passes all 130,514 assertions
+including Aqua with offline resolution.
+
+| 16 receipt encodes | Before bytes / objects | After bytes / objects |
+| --- | ---: | ---: |
+| 32 coefficient triples | 3,020,288 / 49,136 | 2,725,376 / 41,456 |
+| 128 coefficient triples | 11,347,968 / 184,192 | 10,168,320 / 153,472 |
+| 512 coefficient triples | 44,752,512 / 724,944 | 40,033,920 / 602,064 |
+
+Each float leaf saves 192 bytes and five objects. Encode-128 takes
+.006362–.006458 s before and .004846–.005386 s after; encode-512 takes
+.024754–.025518 s before and .018204–.019491 s after. These shared-machine
+fixed-work observations do not establish application throughput.
+
+Four complete write/read/integrity cycles at 32 triples fall from
+3,738,368–3,741,032 / 68,181–68,185 to
+3,664,640–3,667,304 / 66,261–66,265. At 128 triples,
+14,160,288–14,160,744 / 254,618 becomes
+13,864,832–13,865,376 / 246,937–246,938. At 512 triples,
+55,771,104–55,783,512 / 999,821–999,827 becomes
+54,591,456–54,601,864 / 969,101–969,105. Write timings do not establish a speed
+improvement. Parsed decode-128 retains 3,149,696 / 75,280; the non-float write
+control retains a minimum 5,971,456 / 89,609. No zero-allocation archive claim
+is made.
+
+All 29 native collector runs pass: BenchmarkTools, Chairmarks and sampling
+profiles for eight full workloads, plus five bounded allocation profiles.
+Fresh encode-128/512 boundaries use 10,276,352 / 153,648 and
+40,436,864 / 602,240, slightly above the repeated direct operation. One-encode
+allocation profiles use 170,336 / 2,591 and 642,272 / 9,603 at 32/128 triples.
+Fresh four-write-128/512 boundaries use 13,892,576 / 246,984 and
+54,692,928 / 969,148. The bounded profiles use one operation, including
+916,728 / 16,566 for write-32 and 196,856 / 4,705 for parsed decode-128.
+Each bundle is released after compact evidence is extracted.
+
+All nine diagnostic adapters complete for one encode-32 operation. JET retains
+77 findings and AllocCheck retains 263 possible allocations. Inclusive inference
+is 2.439101 s; load/first/warm latency is .144593 / 1.807750 / .001189 s
+under the adapter lifecycle. Three GC and lock samples each use
+170,336 / 2,591, with zero compilation, collection or observed conflicts.
+Reachable fixture state stays 683 bytes, or 65,443 with the encoded result.
+The verified redacted heap snapshot and temporary reports are removed.
