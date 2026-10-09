@@ -427,3 +427,70 @@ zero compilation and one process-wide collection in the first observation;
 three lock observations see no conflicts. Reachable fixture memory stays
 9,300 bytes, or 121,450 with the fresh encoded result. The verified redacted
 heap snapshot and temporary reports are removed.
+
+## Portable float checkpoint decoding, 2026-10-09
+
+String-tagged Float16/Float32/Float64 records now dispatch directly to their
+concrete unsigned bit parser instead of rebuilding a three-entry type Dict for
+every value. Other tag representations retain the original table path. Type
+lookup still precedes the bits lookup, including malformed/unknown tags.
+
+The baseline is MetaStrategist 8bcf8b2f70491ac1b8fb95dd2fb43c14ca4ebfc2 in a
+temporary checkout; versions and dependency sources match except that package
+path. LocalSearchSolvers is e145d7b and CBLS evaluator source is 93e83b6.
+Julia 1.13.1 uses CPUs 0/2, two Julia threads and one GC thread. Three exact
+warmups precede five observations; compilation and recompilation are zero.
+
+The deterministic receipt fixtures contain 32/128/512 triples of Float16,
+Float32 and Float64 coefficient bits. Canonical and complete TOML file SHA-256
+identities captured before the change are fixed in
+[archive_float_scenarios.jl](archive_float_scenarios.jl) and still verify after.
+
+| 16 complete receipt decodes | Before bytes / objects | After bytes / objects |
+| --- | ---: | ---: |
+| 32 coefficient triples, encoded Dict | 1,716,352 / 26,064 | 807,296 / 18,400 |
+| 32 coefficient triples, parsed TOML | 1,767,808 / 27,648 | 833,920 / 19,968 |
+| 128 coefficient triples, encoded Dict | 6,686,336 / 99,808 | 3,049,600 / 69,120 |
+| 128 coefficient triples, parsed TOML | 6,885,248 / 106,000 | 3,149,696 / 75,280 |
+| 512 coefficient triples, encoded Dict | 26,609,792 / 394,640 | 12,062,848 / 271,888 |
+| 512 coefficient triples, parsed TOML | 27,398,528 / 419,264 | 12,456,320 / 296,384 |
+
+The parsed 128 case takes .008430–.008630 s before and .006789–.006891 s
+after; parsed 512 takes .032620–.033205 s before and .026723–.027440 s
+after. These are fixed decoder workloads on a shared machine, with no GC.
+
+Four complete write/read/integrity-verification cycles allocate
+4,205,312–4,208,520 / 72,021–72,026 before and
+3,738,368–3,741,032 / 68,181–68,185 after at 32 triples. At 128 triples,
+16,027,520–16,028,520 / 269,977–269,978 becomes
+14,159,744 / 254,617. At 512 triples,
+63,242,208–63,252,616 / 1,061,261–1,061,265 becomes
+55,771,104–55,781,512 / 999,821–999,825. Both 512 scopes include about
+.0026–.0028 s collection. A receipt without floats retains a minimum
+5,971,456 / 89,609, with one after observation adding 4,136 bytes/two objects
+and overlapping timing ranges. No application-throughput or zero-allocation
+archive claim is made.
+
+All 67,730 new checks pass before and after: every Float16 bit pattern, 2,062
+wider float cases, and 132 exact malformed-input/error/access-order checks.
+The full suite passes 130,514 assertions including Aqua.
+
+BenchmarkTools, Chairmarks and the sampling profiler pass all ten full
+workloads; decoder allocation totals agree with the table. Fresh filesystem
+scopes retain expected lifecycle differences (14,187,488 / 254,664 for four
+128-triple cycles). Six full allocation profiles use one operation each, limited
+to 32/128-triple decodes and 32-triple/non-float writes. For one parsed decode,
+32/128 profiles report 52,120 / 1,248 and 196,856 / 4,705, exactly one sixteenth
+of the table. One float-32 write uses 934,616 / 17,046. An initial large
+full-sampling catalog was stopped after its worker finished, while the controller
+parsed its returned trace; its incomplete catalog is excluded. Bounded runs
+release raw bundles after extracting compact evidence.
+
+All nine diagnostic adapters complete for parsed-128 decoding. JET rises from
+53 to 65 runtime-dispatch findings; AllocCheck falls from 35 to 32 possible
+allocations. This analyzer tradeoff is retained alongside the runtime evidence.
+Inclusive inference is 1.789083 s; load/first/warm latency is
+.140593 / 1.652677 / .020018 s under the adapter lifecycle. Three GC and lock
+samples each allocate 3,149,696 bytes, with zero compilation, collection or
+observed conflicts. Reachable fixture state stays 273,909 bytes, or 276,005
+with the result. The verified redacted heap and temporary reports are removed.
