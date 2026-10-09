@@ -10,6 +10,7 @@ using TestItems
     include("specialization.jl")
     include("resolution_order.jl")
     include("capability_filtering.jl")
+    include("resource_effects.jl")
     include("preparation_services.jl")
     include("reference_preparation.jl")
 end

@@ -155,6 +155,29 @@ end
 _ir_key(phases, inputs, capabilities; shape=false) = bytes2hex(SHA.sha256(canonical_value(
     (; schema="strategy-ir/1",phases=Tuple(_phase_description(p;shape) for p in phases),inputs,capabilities))))
 
+function _resource_member(resource, resources::Tuple)
+    for candidate in resources
+        isequal(resource, candidate) && return true
+    end
+    return false
+end
+function _effects_conflict(a::PhaseDefinition, b::PhaseDefinition)
+    return _tuple_effects_conflict(a.writes, a.invalidates, a.reads,
+        b.writes, b.invalidates, b.reads)::Bool
+end
+function _tuple_effects_conflict(a_writes::Tuple, a_invalidates::Tuple, a_reads::Tuple,
+        b_writes::Tuple, b_invalidates::Tuple, b_reads::Tuple)
+    for resources in (a_writes, a_invalidates), resource in resources
+        (_resource_member(resource, b_reads) ||
+         _resource_member(resource, b_writes) ||
+         _resource_member(resource, b_invalidates)) && return true
+    end
+    for resources in (b_writes, b_invalidates), resource in resources
+        _resource_member(resource, a_reads) && return true
+    end
+    return false
+end
+
 """Resolve only the roots' closure. Reject suppressed dependencies, cycles, unordered
 effects, missing resources/capabilities and multiple owners with actionable phase names.
 """
@@ -227,9 +250,6 @@ function resolve_strategy(catalog::PhaseCatalog, profile::StrategyProfile;
             union!(reachable[r],reachable[successor])
         end
     end
-    mutations=Dict(r=>Set((active[r].definition.writes...,active[r].definition.invalidates...)) for r in roles)
-    readsets=Dict(r=>Set(active[r].definition.reads) for r in roles)
-    accesses=Dict(r=>union(mutations[r],readsets[r]) for r in roles)
     owners=Dict{Symbol,Symbol}()
     for (i,a) in pairs(roles)
         da=active[a].definition
@@ -237,8 +257,9 @@ function resolve_strategy(catalog::PhaseCatalog, profile::StrategyProfile;
             haskey(owners,owned) && throw(ArgumentError("resource $owned owned by $(owners[owned]) and $a"))
             owners[owned]=a
         end
-        for b in roles[i+1:end]
-            conflict=!isdisjoint(mutations[a],accesses[b]) || !isdisjoint(mutations[b],readsets[a])
+        for j in (i+1):lastindex(roles)
+            b=roles[j]
+            conflict=_effects_conflict(da,active[b].definition)
             conflict && !(b in reachable[a]) && !(a in reachable[b]) &&
                 throw(ArgumentError("unordered resource effects between $a and $b; declare before/after"))
         end
@@ -247,8 +268,8 @@ function resolve_strategy(catalog::PhaseCatalog, profile::StrategyProfile;
     phases=ResolvedPhase[active[r] for r in order]
     for p in phases
         d=p.definition
-        issubset(Set(d.reads),available) || throw(ArgumentError("missing/invalid resources for $(d.category): $(setdiff(Set(d.reads),available))"))
-        issubset(Set(d.requires),caps) || throw(ArgumentError("missing capabilities for $(d.category): $(setdiff(Set(d.requires),caps))"))
+        all(resource->resource in available,d.reads) || throw(ArgumentError("missing/invalid resources for $(d.category): $(setdiff(Set(d.reads),available))"))
+        all(capability->capability in caps,d.requires) || throw(ArgumentError("missing capabilities for $(d.category): $(setdiff(Set(d.requires),caps))"))
         setdiff!(available,d.invalidates); union!(available,d.writes); union!(caps,d.provides)
     end
     ins=Tuple(sort!(unique!(Symbol[inputs...]);by=string))

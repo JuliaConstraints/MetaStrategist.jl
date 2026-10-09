@@ -303,3 +303,74 @@ fixture state stays 7,724 bytes, or 11,723 bytes including its final shape
 description. The redacted heap snapshot passes verification and is removed
 with the raw diagnostic artifacts. Timing remains operational evidence on
 a shared machine.
+
+## Resource-effect checks during resolution
+
+The resolver checks resource-effect tuples directly instead of constructing
+three dictionaries of temporary sets. A function boundary specializes their
+concrete tuple contents. Index iteration avoids copying every remaining role
+suffix. Successful resource and capability checks no longer construct sets;
+their existing error messages retain the original set construction.
+Ordering, invalidation/write precedence, ownership and canonical descriptions
+remain unchanged. Factories still do not execute during resolution.
+
+The isolated baseline is MetaStrategist
+`ba019deede736e436e893be187e517fd5a1ce23c`. Both environments contain identical
+LocalSearchSolvers `bcc516b6fa1d3edc9732bebb38a009719491c8d1`, CBLS
+`93e83b62935a24b193bd1566016bb86a8ff16b3a`, frozen shared packages and diagnostic
+dependencies; manifest comparison finds only the MetaStrategist source-path
+difference. Both use CPUs 0 and 2, two Julia threads, one GC thread and one
+BLAS/OpenMP worker. Collection occurs outside five warmed observations; measured
+compilation and collection time are zero.
+
+`resource_scenarios.jl` includes the original resolution fixture as an explicit
+fingerprinted input. Shared-state chains invalidate and rewrite their state,
+wide plans write disjoint resources, and layered plans read sixteen predecessor
+resources. Capability dependencies are active. All ten plain/resource cases
+retain their semantic keys, shape keys and byte-identical canonical snapshots.
+The new resource fixtures check fixed prior-version hash oracles.
+
+| 16 warmed resolutions | Before bytes / objects | After bytes / objects |
+|---|---:|---:|
+| plain chain, 3 phases | 546,752 / 8,546 | 431,808 / 6,690 |
+| plain chain, 64 phases | 13,247,168 / 277,970 | 8,849,856 / 118,722 |
+| plain chain, 129 phases | 31,746,240 / 829,954 | 18,235,072 / 241,154 |
+| plain wide, 64 phases | 11,704,512 / 263,090 | 7,307,200 / 103,842 |
+| plain layers, 64 phases | 16,469,184 / 316,226 | 12,071,872 / 156,978 |
+| resource chain, 3 phases | 610,240 / 9,778 | 496,832 / 8,066 |
+| resource chain, 64 phases | 13,397,696 / 235,426 | 10,032,576 / 141,714 |
+| resource chain, 129 phases | 29,888,320 / 609,634 | 20,604,224 / 287,090 |
+| resource wide, 64 phases | 12,785,344 / 281,106 | 10,468,800 / 251,906 |
+| resource layers, 64 phases | 24,029,376 / 361,698 | 21,086,144 / 317,906 |
+
+The active 129-phase chain spans .040564–.042150 s before and
+.033562–.034319 s after. Active 64-phase wide/layer plans span
+.019199–.020561/.029679–.030066 s before and
+.015016–.015552/.025668–.025902 s after. These are fixed-work observations on a
+shared machine, without an application-throughput claim.
+
+All 61,815 MetaStrategist regressions, including full Aqua, pass. The 37,778 new
+checks also pass against the prior source: every combination of two-resource
+reads/writes/invalidation with three ordering policies, capability availability,
+ownership errors and factory non-execution. A separate prior/current resolver
+comparison matches 16,993 outcomes exactly: 9,329 exception types/messages and
+7,664 canonical snapshots/shape keys. Existing exhaustive four-phase graph
+oracles remain intact. LSS's fourteen private-worker ownership/reset/replay
+checks pass with the final implementation.
+
+All four native collectors pass all five resource cases and the plain
+129-phase case. BenchmarkTools, Chairmarks and full allocation profiles agree
+on one-resolution totals: resource chain 3/64/129 uses
+31,096/627,080/1,287,808 bytes and 505/8,858/17,944 objects; wide/layers uses
+654,344/1,317,928 bytes and 15,745/19,870 objects. The plain 129-phase operation
+uses 1,139,736 bytes and 15,073 objects. Collector time outliers remain visible
+in the raw run; only aggregate allocation evidence is retained here.
+
+All nine native diagnostic adapters complete for the active 64-phase chain.
+JET findings fall from 125 to 96; AllocCheck findings from 124 to 95. This cold
+operation retains dynamic inference and allocations. Inclusive SnoopCompile
+inference is .987 s. Separate load/first/warm lifecycle latency is
+.098/1.522/.002514 s. Three GC and lock observations each allocate 627,080
+bytes, without compilation, collection or observed conflicts. Reachable fixture
+state stays 46,913 bytes, or 55,345 with the result. The verified redacted heap
+snapshot and raw reports are removed.
